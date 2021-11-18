@@ -18,7 +18,8 @@ JVM_OPS="$JVM_OPS -Dfiles=false -Dlogger=logserver@log -Dmask=passw(3,15);token(
 #JVM_OPS="$JVM_OPS -Dlight-search=http://localhost:9200 -DuseIndexer=true -DuseSearch=true"
 #JVM_OPS="$JVM_OPS -Xdebug -Xrunjdwp:transport=dt_socket,address=8000,server=y,suspend=n"
 ENV_OPS="$ENV_OPS workerThreads=1 ioThreads=1 enableHttps=false"
-#ENV_OPS="$ENV_OPS PATH=/usr/java/jdk1.8.0_161/bin:$PATH"
+MODULES="java.base,java.desktop,java.xml,java.naming,jdk.unsupported"
+# ENV_OPS="$ENV_OPS PATH=./dist/bin:$PATH"
 
 usage(){
     echo "Usage: start.sh ( commands ... )"
@@ -30,6 +31,7 @@ usage(){
     echo "  clean       clean target"
     echo "  jar         build $jarfile"
     echo "  jars        copy dependencies to target"
+    echo "  jre			build minimal java runtime"
     echo "  package     build logser.jar and copy dependencies to target"
     echo "  rebuild     stop && build && start"
     echo "  refresh     stop && clean && build && jars && start"
@@ -95,6 +97,12 @@ jar(){
 	mvn compile jar:jar
 }
 
+jre(){
+	rm -rf dist
+	jlink --output dist --add-modules $MODULES
+	du -sh dist
+}
+
 dependency(){
 	mvn dependency:copy-dependencies -DoutputDirectory=target
 }
@@ -132,6 +140,7 @@ else
 	clean) clean ;;
 	jar) jar ;;
 	jars) dependency ;;
+	jre) jre ;;
 	package) jar && dependency ;;
 	rebuild) stop && jar && start ;;
 	refresh) stop && clean && jar && dependency && start ;;
