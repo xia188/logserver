@@ -22,6 +22,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
+
 import com.aliyuncs.DefaultAcsClient;
 import com.aliyuncs.IAcsClient;
 import com.aliyuncs.alidns.model.v20150109.DescribeDomainRecordsRequest;
@@ -95,29 +98,37 @@ public class PageHandler implements LightHttpHandler {
 		String accessKeyId = System.getenv("accessKeyId"), regionId = ExecUtil.firstNotBlank(System.getenv("regionId"), "cn-hangzhou"), secret = System.getenv("secret");
 		boolean configNonBlank = StringUtils.isNotBlank(accessKeyId) && StringUtils.isNotBlank(secret)
 				&& StringUtils.isNotBlank(regionId);
-		metricEnabled = configNonBlank && !"false".equalsIgnoreCase(System.getenv("metricEnabled"));
+		metricEnabled = configNonBlank && "true".equalsIgnoreCase(System.getenv("metricEnabled"));
 		dnsEnabled = configNonBlank && !"false".equalsIgnoreCase(System.getenv("dnsEnabled"));
 		log.info("accessKeyId={}, metricEnabled={}, regionId={}, recordId={}, dnsEnabled={}", accessKeyId, metricEnabled, regionId, recordId, dnsEnabled);
 		profile = DefaultProfile.getProfile(regionId, accessKeyId, secret);
 		profile.setCloseTrace(true);// 关闭opentracing但是依赖不能去除
 		HttpClientConfig config = profile.getHttpClientConfig();
-		// config.setClientType(com.aliyuncs.http.HttpClientType.Compatible);
-		config.setIgnoreSSLCerts(true);
+		config.setClientType(com.aliyuncs.http.HttpClientType.Compatible);
+		config.setCompatibleMode(true);
+		config.setHostnameVerifier(new HostnameVerifier() {
+			@Override
+			public boolean verify(String hostname, SSLSession session) {
+				return true;
+			}
+		});
 		if (configNonBlank) {
 			client = new DefaultAcsClient(profile);
 			httpClient = ((DefaultAcsClient) client).getHttpClient();
 		} else {
 			httpClient = HttpClientFactory.buildClient(profile);
 		}
-		//每15秒上报一次统计数据，每4个小时清理一下统计数据
-		scheduler.scheduleWithFixedDelay(this::putCustomMetrics, 15, 15, TimeUnit.SECONDS);
-		Calendar calendar = Calendar.getInstance();
-		long minuteOfHour = TimeUnit.HOURS.toMinutes(1);
-		long minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY)*minuteOfHour+calendar.get(Calendar.MINUTE);
-		long range = 4*minuteOfHour;
-		long minuteToWait = range - (minuteOfDay%range);
-		log.info("metrics map wait {} minutes to clear, client={}", minuteToWait, client);
-		scheduler.scheduleWithFixedDelay(metricsMap::clear, minuteToWait, range, TimeUnit.MINUTES);
+		if(metricEnabled){
+			//每15秒上报一次统计数据，每4个小时清理一下统计数据
+			scheduler.scheduleWithFixedDelay(this::putCustomMetrics, 15, 15, TimeUnit.SECONDS);
+			Calendar calendar = Calendar.getInstance();
+			long minuteOfHour = TimeUnit.HOURS.toMinutes(1);
+			long minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY)*minuteOfHour+calendar.get(Calendar.MINUTE);
+			long range = 4*minuteOfHour;
+			long minuteToWait = range - (minuteOfDay%range);
+			log.info("metrics map wait {} minutes to clear, client={}", minuteToWait, client);
+			scheduler.scheduleWithFixedDelay(metricsMap::clear, minuteToWait, range, TimeUnit.MINUTES);
+		}
 	}
 
 	private void putCustomMetrics() {
@@ -260,9 +271,7 @@ public class PageHandler implements LightHttpHandler {
 	private String list(HttpServerExchange exchange) throws Exception {
 		String search = getParam(exchange, "search");
 		List<String> list = null;
-		if (StringUtils.isBlank(search)) {
-			list = ExecUtil.list(search);
-		} else {
+		if (Boolean.getBoolean("useSearch")) {
 			list = new ArrayList<>();
 			String url = lightSearch + "/service/logserver/list" + "?search=" + Util.urlEncode(search);
 			HttpRequest request = new HttpRequest(url);
@@ -284,6 +293,8 @@ public class PageHandler implements LightHttpHandler {
 					}
 				}
 			}
+		} else {
+			list = ExecUtil.list(search);
 		}
 		log.info("page logs list: {}", search);
 		return mapper.writeValueAsString(list);
@@ -347,8 +358,10 @@ public class PageHandler implements LightHttpHandler {
 		String value = getParam(exchange, "value");
 		String appName = getParam(exchange, "appName");
 		if(StringUtils.isNotBlank(metricName) && StringUtils.isNotBlank(appName) && StringUtils.isNotBlank(value)) {
-			String[] metric = new String[] {metricName, value, appName};
-			metrics.offerLast(metric);
+			if(metricEnabled){
+				String[] metric = new String[] {metricName, value, appName};
+				metrics.offerLast(metric);
+			}
 			return "{\"metric\":"+metricEnabled+"}";
 		}else {
 			Map<String, Integer> map = new TreeMap<>();
@@ -431,8 +444,9 @@ public class PageHandler implements LightHttpHandler {
 	
 	private String alidns(HttpServerExchange exchange) {
 		String recordId = getParam(exchange, "recordId"), ip = getParam(exchange, "ip");
-		if (StringUtils.isNotBlank(recordId) && (StringUtils.isBlank(LajaxHandler.token)
-				|| LajaxHandler.token.equals(exchange.getRequestHeaders().getFirst("X-Request-Token")))) {
+		if (dnsEnabled && StringUtils.isNotBlank(recordId)
+				&& (StringUtils.isBlank(ip) || StringUtils.isBlank(LajaxHandler.token)
+						|| LajaxHandler.token.equals(exchange.getRequestHeaders().getFirst("X-Request-Token")))) {
 			try {
 				DescribeDomainRecordsRequest query = new DescribeDomainRecordsRequest();
 				query.setSysRegionId(profile.getRegionId());
