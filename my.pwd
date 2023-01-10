@@ -1,3 +1,6 @@
+#daemon=true
+#logback=logfile.xml
+#filebeat=filebeat.log,filebeat2.log
 token=xlongwei
 accessKeyId=
 secret=
