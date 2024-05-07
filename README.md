@@ -80,12 +80,9 @@ var logger = new Lajax({
 
 ##### 整体设计
 
-[设计图](http://115.28.229.158/tool/images/logserver/logserver.png)：底层使用logback+socket、lajax+http传输日志，后端推荐logback.xml方式，可选starter依赖，前端支持web和uni-app形式，logserver可选使用light-search+lucene创建索引，详细用法见[wiki](https://gitee.com/xlongwei/logserver/wikis)。
+[架构设计](http://115.28.229.158/tool/images/logserver/logserver.png)：底层使用logback+socket、lajax+http传输日志，后端推荐logback.xml方式，可选starter依赖，前端支持web和uni-app形式，logserver可选使用light-search+lucene创建索引，详细用法见[wiki](https://gitee.com/xlongwei/logserver/wikis)。
 
-![logserver](http://115.28.229.158/tool/images/logserver/logserver.png)
-
-
-[搜索演示](http://115.28.229.158/tool/images/logserver/search.png)
+[日志搜索](http://115.28.229.158/tool/images/logserver/search.png)
 
 
 ##### Nginx配置
