@@ -82,13 +82,13 @@ var logger = new Lajax({
 
 设计图：底层使用logback+socket、lajax+http传输日志，后端推荐logback.xml方式，可选starter依赖，前端支持web和uni-app形式，logserver可选使用light-search+lucene创建索引，详细用法见[wiki](https://gitee.com/xlongwei/logserver/wikis)。
 
-![logserver](http://t.xlongwei.com/images/logserver/logserver.png)
+![logserver](http://115.28.229.158/tool/images/logserver/logserver.png)
 
 演示地址：[https://log.xlongwei.com/](https://log.xlongwei.com/)
 
-![search](http://t.xlongwei.com/images/logserver/search.png)
+![search](http://115.28.229.158/tool/images/logserver/search.png)
 
 
 ##### Nginx配置
 
-登录认证见[pass.db](http://api.xlongwei.com/doku.php?id=tools:logstation)生成命令，nginx配置参考[log.conf](https://gitee.com/xlongwei/logserver/blob/master/aliyun/log.conf)。
+登录认证见[pass.db](http://115.28.229.158/doku.php?id=tools:logstation)生成命令，nginx配置参考[log.conf](https://gitee.com/xlongwei/logserver/blob/master/aliyun/log.conf)。
